@@ -2,16 +2,5 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "outputDirectory": ".next",
-  "framework": "nextjs",
-  "env": {
-    "THESYS_API_KEY": {
-      "description": "Thesys C1 API Key for dashboard generation",
-      "required": true
-    },
-    "NEXT_PUBLIC_API_URL": {
-      "description": "Public API URL",
-      "default": "https://thesys-c1-dashboard.vercel.app",
-      "required": false
-    }
-  }
+  "framework": "nextjs"
 }
