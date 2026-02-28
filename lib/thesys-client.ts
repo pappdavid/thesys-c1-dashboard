@@ -34,7 +34,7 @@ If the user provides specific context (repo name, team, metrics), incorporate th
 export async function callThesysC1(userPrompt: string): Promise<string> {
   try {
     const response = await thesysClient.chat.completions.create({
-      model: 'c1',
+      model: 'c1/anthropic/claude-sonnet-4',
       messages: [
         {
           role: 'system',
