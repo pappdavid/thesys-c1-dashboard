@@ -1,4 +1,5 @@
 # Thesys C1 Developer Dashboard
+> Deployed on Vercel with Thesys C1 API integration
 
 A production-ready Next.js application that integrates Thesys C1 AI to generate dynamic developer dashboards on demand. Built for rapid deployment on Vercel with GitHub Actions CI/CD.
 
