@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import C1Component from '@/components/C1Component';
+import { PANELS } from '@/lib/panel-config';
 import {
-  Sparkles,
   TrendingUp,
   TrendingDown,
   Minus,
-  ArrowRight,
   RefreshCw,
   Rocket,
   GitPullRequest,
@@ -58,52 +57,59 @@ const KPI_DATA = [
   },
 ];
 
-const QUICK_PROMPTS = [
-  "Team PRs & review queue",
-  "Production deployment history",
-  "Open issues by priority",
-  "CI/CD pipeline status",
-];
+/* ── Per-panel state shape ── */
+interface PanelState {
+  content: string;
+  loading: boolean;
+  error: string;
+}
+
+const emptyPanelState = (): PanelState => ({ content: '', loading: false, error: '' });
 
 export default function DashboardPage() {
-  const [dashboardHtml, setDashboardHtml] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [userPrompt, setUserPrompt] = useState('');
+  const [panels, setPanels] = useState<Record<string, PanelState>>(
+    () => Object.fromEntries(PANELS.map((p) => [p.id, emptyPanelState()]))
+  );
 
-  const generateDashboard = useCallback(async (prompt = '') => {
-    setIsLoading(true);
-    setError('');
+  /* ── Fetch a single panel ── */
+  const fetchPanel = useCallback(async (panelId: string) => {
+    setPanels((prev) => ({
+      ...prev,
+      [panelId]: { ...prev[panelId], loading: true, error: '' },
+    }));
+
     try {
       const res = await fetch('/api/dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userPrompt: prompt }),
+        body: JSON.stringify({ panelId }),
       });
       if (!res.ok) throw new Error(`API error: ${res.statusText}`);
       const data = await res.json();
-      setDashboardHtml(data.html || '');
+
+      setPanels((prev) => ({
+        ...prev,
+        [panelId]: { content: data.html ?? '', loading: false, error: '' },
+      }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate dashboard');
-    } finally {
-      setIsLoading(false);
+      setPanels((prev) => ({
+        ...prev,
+        [panelId]: {
+          content: '',
+          loading: false,
+          error: err instanceof Error ? err.message : 'Failed to generate panel',
+        },
+      }));
     }
   }, []);
 
+  /* ── Load all panels in parallel on mount ── */
   useEffect(() => {
-    generateDashboard();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    PANELS.forEach((p) => fetchPanel(p.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    generateDashboard(userPrompt);
-  };
-
-  const handleQuickPrompt = (p: string) => {
-    setUserPrompt(p);
-    generateDashboard(p);
-  };
+  const anyLoading = PANELS.some((p) => panels[p.id]?.loading);
 
   return (
     <DashboardLayout title="Developer Dashboard">
@@ -141,73 +147,37 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* ── Content + Sidebar ── */}
-      <div className="flex flex-col gap-4 lg:flex-row">
-
-        {/* C1 generated content */}
-        <div className="min-w-0 flex-1">
-          <C1Component html={dashboardHtml} isLoading={isLoading} error={error} />
-        </div>
-
-        {/* Customisation panel */}
-        <div className="w-full flex-shrink-0 lg:w-72">
-          <div className="prompt-panel sticky top-0">
-            <div className="prompt-panel-header">
-              <Sparkles size={13} className="prompt-panel-icon" />
-              Customize
-            </div>
-            <p className="prompt-panel-description">
-              Describe the view you need and C1 will generate it instantly.
-            </p>
-
-            <form onSubmit={handleSubmit}>
-              <textarea
-                className="prompt-textarea"
-                placeholder="e.g., Show my team's open PRs sorted by staleness, deployment status for prod, and recent incidents…"
-                value={userPrompt}
-                onChange={(e) => setUserPrompt(e.target.value)}
-                rows={4}
-              />
-              <div className="mt-2.5 flex gap-2">
-                <button type="submit" disabled={isLoading} className="btn-generate flex-1">
-                  {isLoading
-                    ? <RefreshCw size={12} className="animate-spin" />
-                    : <Sparkles size={12} />
-                  }
-                  {isLoading ? 'Generating…' : 'Generate'}
-                </button>
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  className="btn-refresh"
-                  title="Reset to default"
-                  onClick={() => { setUserPrompt(''); generateDashboard(''); }}
-                >
-                  <RefreshCw size={13} />
-                </button>
-              </div>
-            </form>
-
-            {/* Quick prompts */}
-            <div className="mt-5">
-              <p className="quick-prompts-label">Quick prompts</p>
-              <div className="mt-2 flex flex-col gap-1">
-                {QUICK_PROMPTS.map((p) => (
-                  <button
-                    key={p}
-                    className="quick-prompt-btn"
-                    onClick={() => handleQuickPrompt(p)}
-                  >
-                    <ArrowRight size={10} className="quick-prompt-icon" />
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
+      {/* ── Section header ── */}
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="panels-section-title">Live Panels</h2>
+        <button
+          className="btn-refresh-all"
+          onClick={() => PANELS.forEach((p) => fetchPanel(p.id))}
+          disabled={anyLoading}
+          title="Refresh all panels"
+        >
+          <RefreshCw size={12} className={anyLoading ? 'animate-spin' : ''} />
+          Refresh all
+        </button>
       </div>
+
+      {/* ── 2-column panel grid ── */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {PANELS.map((panel) => {
+          const state = panels[panel.id];
+          return (
+            <C1Component
+              key={panel.id}
+              title={panel.title}
+              html={state.content}
+              isLoading={state.loading}
+              error={state.error}
+              onRefresh={() => fetchPanel(panel.id)}
+            />
+          );
+        })}
+      </div>
+
     </DashboardLayout>
   );
 }

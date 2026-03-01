@@ -420,6 +420,75 @@ body {
 .c1-html ul, .c1-html ol { padding-left: 20px; margin: 0 0 12px; }
 .c1-html li { margin-bottom: 4px; }
 
+/* ── Panel header (inside each C1 card) ── */
+.c1-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.c1-panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.c1-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  color: var(--text-subtle);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.c1-refresh-btn:hover:not(:disabled) {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+}
+.c1-refresh-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Panels section header ── */
+.panels-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.btn-refresh-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Manrope', sans-serif;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-refresh-all:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.btn-refresh-all:disabled { opacity: 0.4; cursor: not-allowed; }
+
 /* Status badge helpers (for C1-generated content) */
 .c1-html .badge {
   display: inline-flex;
