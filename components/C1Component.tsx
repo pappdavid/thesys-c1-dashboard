@@ -2,6 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+// Load the Thesys renderer client-side only — it uses browser APIs
+const ThesysRenderer = dynamic(() => import('./ThesysRenderer'), { ssr: false });
 
 interface C1ComponentProps {
   html: string;
@@ -10,10 +14,10 @@ interface C1ComponentProps {
 }
 
 export default function C1Component({ html, isLoading = false, error }: C1ComponentProps) {
-  const [sanitizedHtml, setSanitizedHtml] = useState(html);
+  const [c1Response, setC1Response] = useState(html);
 
   useEffect(() => {
-    setSanitizedHtml(html);
+    setC1Response(html);
   }, [html]);
 
   return (
@@ -66,12 +70,11 @@ export default function C1Component({ html, isLoading = false, error }: C1Compon
             </div>
           </div>
         </div>
-      ) : sanitizedHtml ? (
-        /* Rendered C1 content */
-        <div
-          className="c1-html p-6"
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
+      ) : c1Response ? (
+        /* Rendered C1 component spec via Thesys SDK */
+        <div className="p-4">
+          <ThesysRenderer c1Response={c1Response} />
+        </div>
       ) : (
         /* Idle state */
         <div

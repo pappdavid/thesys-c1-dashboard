@@ -8,6 +8,12 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
+  transpilePackages: [
+    '@thesysai/genui-sdk',
+    '@crayonai/react-ui',
+    '@crayonai/react-core',
+    'react-day-picker',
+  ],
 };
 
 module.exports = nextConfig;
