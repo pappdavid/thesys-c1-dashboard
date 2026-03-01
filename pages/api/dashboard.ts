@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { callThesysC1 } from '@/lib/thesys-client';
+import { callThesysC1Panel } from '@/lib/thesys-client';
 
 type ResponseData = {
   html?: string;
@@ -15,13 +15,14 @@ export default async function handler(
   }
 
   try {
-    const { userPrompt = '' } = req.body;
+    const { panelId = 'pull-requests', userContext = '' } = req.body;
 
-    const html = await callThesysC1(userPrompt);
+    const html = await callThesysC1Panel(panelId, userContext);
 
     res.status(200).json({ html });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to generate panel';
     console.error('Dashboard API error:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate dashboard' });
+    res.status(500).json({ error: message });
   }
 }
