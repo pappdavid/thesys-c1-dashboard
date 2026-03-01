@@ -48,8 +48,8 @@ export default function C1Component({
   );
 
   // CardContent Component
-  const CardContent = ({ children }: { children: React.ReactNode }) => (
-    <div className="px-6 py-4">{children}</div>
+  const CardContent = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+    <div className={clsx('px-6 py-4', className)}>{children}</div>
   );
 
   // Alert Component (Error State)
