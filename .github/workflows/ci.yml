@@ -37,36 +37,4 @@ jobs:
         env:
           THESYS_API_KEY: ${{ secrets.THESYS_API_KEY }}
 
-  deploy-preview:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to Vercel (Preview)
-        uses: vercel/action@v4
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          scope: ${{ secrets.VERCEL_ORG_ID }}
-          alias: pr-${{ github.event.number }}
-
-  deploy-production:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to Vercel (Production)
-        uses: vercel/action@v4
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          scope: ${{ secrets.VERCEL_ORG_ID }}
-          production: true
+  # Deployments are handled automatically by the Vercel GitHub integration
