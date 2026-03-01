@@ -496,19 +496,18 @@ body {
   .panel-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ── Individual panel card ── */
+/* ── Individual panel card (frameless) ── */
 .dashboard-panel {
   display: flex;
   flex-direction: column;
   background: transparent;
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: box-shadow 0.2s;
   animation: fadeInUp 0.35s ease both;
 }
 .dashboard-panel.panel-drag-over {
-  border-color: var(--accent-purple);
   box-shadow: 0 0 0 2px var(--accent-purple-glow), 0 8px 32px rgba(0,0,0,0.4);
 }
 
@@ -589,8 +588,8 @@ body {
 .panel-ctrl-btn-danger:hover { background: rgba(239,68,68,0.12); color: #f87171; }
 .panel-ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-/* ── Panel content area ── */
-.panel-content { flex: 1; min-height: 240px; overflow: auto; }
+/* ── Panel content area (auto-sized to match rendered content) ── */
+.panel-content { flex: 1; overflow: auto; }
 .panel-skeleton { padding: 20px; }
 
 .panel-error {
@@ -612,7 +611,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 240px;
+  padding: 40px 20px;
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -762,3 +761,39 @@ body {
   border: none;
   padding: 0;
 }
+
+/* ========================================
+   INTERACTIVE PANEL FOOTER (C1 panels with form elements)
+   ======================================== */
+.panel-interactive-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.panel-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'Manrope', sans-serif;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent-green), #16a34a);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px var(--accent-green-glow);
+  transition: all 0.2s;
+}
+.panel-save-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+  transform: translateY(-1px);
+}
+.panel-save-btn:disabled { opacity: 0.45; cursor: not-allowed; }

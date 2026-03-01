@@ -14,7 +14,7 @@ import {
   MessageSquare,
   LayoutDashboard,
 } from 'lucide-react';
-import { DashboardCommand } from '@/lib/thesys-client';
+import type { DashboardCommand } from '@/lib/thesys-client';
 
 /* ── Static KPI data ── */
 const KPI_DATA = [
@@ -30,16 +30,17 @@ let _idCounter = 0;
 function newId() { return `panel-${Date.now()}-${++_idCounter}`; }
 
 function makePanel(overrides: Partial<Panel> = {}): Panel {
+  const type = overrides.type ?? 'c1';
   return {
     id: newId(),
     panelKey: undefined,
-    type: 'c1',
+    type,
     title: 'New Panel',
     content: '',
     isLoading: false,
     error: '',
     userPrompt: '',
-    hasInput: true,
+    hasInput: type === 'chat',   // text input only for chat panels
     ...overrides,
   };
 }
@@ -47,8 +48,8 @@ function makePanel(overrides: Partial<Panel> = {}): Panel {
 // ── Initial panels from PANELS config + an agent chat panel ─────────────────
 
 const INITIAL_PANELS: Panel[] = [
-  ...PANELS.map(p => makePanel({ id: p.id, panelKey: p.id, type: 'c1', title: p.title, hasInput: true })),
-  makePanel({ type: 'chat', title: 'Agent Assistant', hasInput: true }),
+  ...PANELS.map(p => makePanel({ id: p.id, panelKey: p.id, type: 'c1', title: p.title })),
+  makePanel({ type: 'chat', title: 'Agent Assistant' }),
 ];
 
 // ── Dashboard page ───────────────────────────────────────────────────────────
@@ -198,20 +199,26 @@ export default function DashboardPage() {
   const handleSubmit    = useCallback((id: string) => fetchPanel(id), [fetchPanel]);
   const handleRefresh   = useCallback((id: string) => fetchPanel(id), [fetchPanel]);
   const handleRemove    = useCallback((id: string) => setPanels(prev => prev.filter(p => p.id !== id)), []);
-  const handleToggleInput = useCallback((id: string) => {
-    setPanels(prev => prev.map(p => p.id === id ? { ...p, hasInput: !p.hasInput } : p));
-  }, []);
   const handleToggleType  = useCallback((id: string) => {
     setPanels(prev => prev.map(p =>
-      p.id === id ? { ...p, type: p.type === 'c1' ? 'chat' : 'c1', content: '' } : p
+      p.id === id
+        ? { ...p, type: p.type === 'c1' ? 'chat' : 'c1', content: '', hasInput: p.type === 'c1' }
+        : p
     ));
   }, []);
+
+  /** Collect form data from an interactive C1 panel and send to agent */
+  const handleSaveInteractive = useCallback((id: string, formData: Record<string, string>) => {
+    const entries = Object.entries(formData);
+    if (entries.length === 0) return;
+    const summary = entries.map(([k, v]) => `${k}: ${v}`).join('\n');
+    fetchPanel(id, `User submitted the following form values:\n${summary}\n\nPlease process these inputs and update accordingly.`);
+  }, [fetchPanel]);
 
   const addPanel = (type: 'c1' | 'chat') => {
     setPanels(prev => [...prev, makePanel({
       type,
       title: type === 'c1' ? 'C1 Panel' : 'Chat Panel',
-      hasInput: true,
     })]);
   };
 
@@ -280,9 +287,9 @@ export default function DashboardPage() {
             onPromptChange={handlePromptChange}
             onSubmit={handleSubmit}
             onRemove={handleRemove}
-            onToggleInput={handleToggleInput}
             onToggleType={handleToggleType}
             onRefresh={handleRefresh}
+            onSaveInteractive={handleSaveInteractive}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
