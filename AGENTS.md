@@ -6,6 +6,8 @@
 
 Single-service Next.js 14 app (Thesys C1 Developer Dashboard). No database, no Docker, no auxiliary services. The only external dependency is the Thesys C1 API at `api.thesys.dev`, which requires a valid `THESYS_API_KEY`.
 
+Production is deployed on Vercel, connected to GitHub. Vercel preview deployments have Deployment Protection enabled (401 unless authenticated with Vercel). For local development, use `npm run dev` on port 3000.
+
 ### Node.js version
 
 Use Node.js 20 (set as nvm default). The CI matrix tests on Node 18 and 20.
