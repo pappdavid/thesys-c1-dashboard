@@ -1,87 +1,257 @@
 'use client';
 
-import React, { ReactNode } from 'react';
-import { Menu, X, Settings, BarChart3 } from 'lucide-react';
+import React, { ReactNode, useState } from 'react';
+import {
+  LayoutDashboard,
+  GitPullRequest,
+  Workflow,
+  AlertCircle,
+  ScrollText,
+  Users,
+  Settings,
+  Key,
+  Menu,
+  X,
+  Bell,
+  Search,
+  ChevronRight,
+  Zap,
+} from 'lucide-react';
 import clsx from 'clsx';
+
+interface NavItem {
+  label: string;
+  icon: React.ReactNode;
+  badge?: number;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: 'Overview',      icon: <LayoutDashboard size={15} /> },
+  { label: 'Pull Requests', icon: <GitPullRequest  size={15} />, badge: 4 },
+  { label: 'CI/CD',         icon: <Workflow        size={15} /> },
+  { label: 'Issues',        icon: <AlertCircle     size={15} />, badge: 12 },
+  { label: 'Logs',          icon: <ScrollText      size={15} /> },
+  { label: 'Team',          icon: <Users           size={15} /> },
+];
 
 interface DashboardLayoutProps {
   children: ReactNode;
   title?: string;
 }
 
-export default function DashboardLayout({
-  children,
-  title = 'Dashboard',
-}: DashboardLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
-
-  const navLabels = ['Overview', 'Pull Requests', 'CI/CD Pipeline', 'Issues', 'Logs'];
+export default function DashboardLayout({ children, title = 'Dashboard' }: DashboardLayoutProps) {
+  const [activeNav, setActiveNav] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-50">
-      {/* Sidebar */}
+    <div
+      className="flex h-screen overflow-hidden"
+      style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+    >
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ background: 'rgba(7, 9, 18, 0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar ── */}
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border-r border-slate-700/50 transition-transform duration-300 ease-in-out md:relative md:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex w-56 flex-col transition-transform duration-300 ease-out md:relative md:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
+        style={{
+          background: 'var(--bg-surface)',
+          borderRight: '1px solid var(--border-subtle)',
+        }}
       >
-        {/* Sidebar Header */}
-        <div className="flex h-16 items-center gap-2 border-b border-slate-700/50 px-6 bg-gradient-to-r from-purple-600/10 to-blue-600/10 backdrop-blur">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-              T
-            </div>
-            <span className="font-semibold text-sm">Thesys C1</span>
+        {/* Brand */}
+        <div
+          className="flex h-14 flex-shrink-0 items-center gap-3 px-4"
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}
+        >
+          <div
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
+            style={{
+              background: 'linear-gradient(135deg, var(--accent-purple), var(--accent-cyan))',
+              boxShadow: '0 0 14px var(--accent-purple-glow)',
+            }}
+          >
+            <Zap size={13} color="#fff" />
           </div>
+          <div className="min-w-0 flex-1">
+            <span
+              className="text-sm font-bold tracking-tight"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Thesys
+            </span>
+            <span
+              className="ml-1 text-xs font-semibold"
+              style={{ color: 'var(--accent-purple-light)' }}
+            >
+              C1
+            </span>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="ml-auto flex-shrink-0 rounded-md p-1 md:hidden"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <X size={15} />
+          </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex flex-col gap-1 p-4">
-          {navLabels.map((label, idx) => (
-            <button
-              key={label}
-              className={clsx(
-                'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                idx === 0
-                  ? 'bg-gradient-to-r from-blue-500/30 to-purple-600/30 text-white shadow-lg shadow-blue-500/20 border border-blue-400/50'
-                  : 'text-slate-400 hover:text-slate-50 hover:bg-slate-800/50 border border-transparent'
-              )}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Section label */}
+        <div className="px-4 pb-1.5 pt-5">
+          <span
+            className="text-[9px] font-bold uppercase tracking-widest"
+            style={{ color: 'var(--text-subtle)' }}
+          >
+            Platform
+          </span>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2">
+          {NAV_ITEMS.map((item, idx) => {
+            const active = activeNav === idx;
+            return (
+              <button
+                key={item.label}
+                onClick={() => { setActiveNav(idx); setSidebarOpen(false); }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                style={{
+                  background:   active ? 'rgba(124,58,237,0.1)'  : 'transparent',
+                  color:        active ? 'var(--accent-purple-light)' : 'var(--text-muted)',
+                  borderLeft:   active ? '2px solid var(--accent-purple)' : '2px solid transparent',
+                }}
+              >
+                <span style={{ color: active ? 'var(--accent-purple-light)' : 'var(--text-subtle)', flexShrink: 0 }}>
+                  {item.icon}
+                </span>
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.badge !== undefined && (
+                  <span
+                    className="flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold"
+                    style={{
+                      background: active ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.07)',
+                      color:      active ? 'var(--accent-purple-light)' : 'var(--text-muted)',
+                    }}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Separator */}
-        <div className="mx-4 my-4 h-px bg-gradient-to-r from-slate-700/0 via-slate-700/50 to-slate-700/0" />
-
-        {/* Settings Section */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-slate-700/50 bg-slate-900/80 backdrop-blur p-4">
-          <button className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-50 hover:bg-slate-800/50 transition-all duration-200">
-            <Settings size={18} />
-            Settings
-          </button>
+        {/* Footer */}
+        <div
+          className="flex-shrink-0 space-y-0.5 p-2"
+          style={{ borderTop: '1px solid var(--border-subtle)' }}
+        >
+          {[
+            { icon: <Key size={14} />, label: 'API Keys' },
+            { icon: <Settings size={14} />, label: 'Settings' },
+          ].map((item) => (
+            <button
+              key={item.label}
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex flex-1 flex-col">
+      {/* ── Main wrapper ── */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex h-16 items-center gap-4 border-b border-slate-700/50 bg-gradient-to-r from-slate-900/50 to-slate-900/30 px-6 backdrop-blur-sm">
+        <header
+          className="flex h-14 flex-shrink-0 items-center gap-3 px-5"
+          style={{
+            background: 'rgba(20, 20, 40, 0.85)',
+            backdropFilter: 'blur(14px)',
+            borderBottom: '1px solid var(--border-subtle)',
+          }}
+        >
+          {/* Mobile hamburger */}
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-lg p-2 hover:bg-slate-800/50 transition-colors md:hidden"
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-md p-1.5 md:hidden"
+            style={{ color: 'var(--text-muted)' }}
           >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            <Menu size={17} />
           </button>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            {title}
-          </h1>
+
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-sm">
+            <span style={{ color: 'var(--text-subtle)' }}>Platform</span>
+            <ChevronRight size={13} style={{ color: 'var(--text-subtle)' }} />
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {title}
+            </span>
+          </div>
+
+          {/* Right controls */}
+          <div className="ml-auto flex items-center gap-2">
+            {/* Search pill */}
+            <div
+              className="hidden items-center gap-2 rounded-lg px-3 py-1.5 sm:flex"
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-default)',
+                color: 'var(--text-muted)',
+                cursor: 'text',
+              }}
+            >
+              <Search size={12} />
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Search…</span>
+              <span
+                className="ml-3 rounded px-1 text-[10px]"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  color: 'var(--text-subtle)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                ⌘K
+              </span>
+            </div>
+
+            {/* Notifications */}
+            <button
+              className="relative rounded-lg p-2"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}
+            >
+              <Bell size={14} style={{ color: 'var(--text-muted)' }} />
+              <span
+                className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full"
+                style={{ background: 'var(--accent-pink)' }}
+              />
+            </button>
+
+            {/* Avatar */}
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
+              style={{
+                background: 'linear-gradient(135deg, var(--accent-purple), var(--accent-cyan))',
+              }}
+            >
+              D
+            </div>
+          </div>
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900">
+        <main className="flex-1 overflow-auto p-5 md:p-6">
           {children}
         </main>
       </div>
