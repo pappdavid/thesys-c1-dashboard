@@ -7,6 +7,14 @@ import dynamic from 'next/dynamic';
 // Load the Thesys renderer client-side only — it uses browser APIs
 const ThesysRenderer = dynamic(() => import('./ThesysRenderer'), { ssr: false });
 
+// Background used for states where the SDK isn't rendering (skeleton / error / idle)
+const FALLBACK_BG: React.CSSProperties = {
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: '12px',
+  minHeight: '240px',
+};
+
 interface C1ComponentProps {
   html: string;
   isLoading?: boolean;
@@ -27,9 +35,14 @@ export default function C1Component({
     setC1Response(html);
   }, [html]);
 
-  return (
-    <div className="c1-content-card">
+  /* ── States that need the fallback dark card background ── */
+  const needsFallback = isLoading || !!error || !c1Response;
 
+  return (
+    <div
+      className="c1-content-card"
+      style={needsFallback ? FALLBACK_BG : undefined}
+    >
       {/* Refresh button — icon-only, reveals on card hover */}
       {onRefresh && (
         <button
@@ -78,14 +91,12 @@ export default function C1Component({
           </div>
         </div>
       ) : c1Response ? (
-        /* Rendered C1 component spec via Thesys SDK */
-        <div className="p-3">
-          <ThesysRenderer c1Response={c1Response} />
-        </div>
+        /* Dark-themed C1 component spec — SDK surface is the visual card */
+        <ThesysRenderer c1Response={c1Response} />
       ) : (
-        /* Idle / pre-load state */
+        /* Idle / pre-load */
         <div
-          className="flex items-center justify-center gap-2 py-12"
+          className="flex items-center justify-center py-16"
           style={{ color: 'var(--text-muted)' }}
         >
           <RefreshCw size={14} className="animate-spin opacity-30" />

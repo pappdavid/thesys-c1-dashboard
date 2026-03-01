@@ -339,16 +339,16 @@ body {
 /* ========================================
    C1 CONTENT CARD
    ======================================== */
+
+/* Frameless — the SDK's own dark-mode surface provides all chrome.
+   Skeleton/error states add back a background via inline style in JSX. */
 .c1-content-card {
   position: relative;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   overflow: hidden;
-  min-height: 320px;
 }
 
-/* Hover-reveal refresh icon — no text, no persistent header */
+/* Hover-reveal refresh icon */
 .c1-refresh-overlay {
   position: absolute;
   top: 8px;
@@ -361,17 +361,17 @@ body {
   height: 24px;
   border-radius: 6px;
   color: var(--text-muted);
-  background: var(--bg-elevated);
+  background: rgba(15, 15, 35, 0.72);
   border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(4px);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  transition: opacity 0.15s, color 0.15s;
 }
 .c1-content-card:hover .c1-refresh-overlay { opacity: 1; }
 .c1-refresh-overlay:hover:not(:disabled) {
   color: var(--text-primary);
-  background: var(--bg-card-hover);
-  border-color: var(--border-default);
+  background: rgba(15, 15, 35, 0.92);
 }
 .c1-refresh-overlay:disabled { opacity: 0.3 !important; cursor: not-allowed; }
 
