@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 
-// ── Per-panel system prompts ────────────────────────────────────────────────
+// ── Per-panel system prompts (named panels) ─────────────────────────────────
 
-const PANEL_SYSTEM_PROMPTS: Record<string, string> = {
+export const PANEL_SYSTEM_PROMPTS: Record<string, string> = {
   'pull-requests': `You are a Pull Requests dashboard panel. Generate a compact, scannable UI showing:
 - 4–6 open pull requests, each with: title, author name, target branch, age (e.g. "2d"), status badge (Draft / Review Needed / Approved / Conflicts), and comment count
 - Color-coded status badges: gray=Draft, amber=Review Needed, green=Approved, red=Conflicts
@@ -39,6 +39,50 @@ Dark theme. Feed-style layout, newest first.`,
 Dark theme, green/red/amber status colors.`,
 };
 
+// ── Generic system prompts ──────────────────────────────────────────────────
+
+const C1_GENERIC_PROMPT = `You are a Developer Operations Dashboard Agent. Generate a compact, interactive developer dashboard panel.
+Include realistic sample data, clear visual hierarchy, status indicators, and dark theme styling (background #16213E, borders rgba(255,255,255,0.07)).`;
+
+const CHAT_SYSTEM_PROMPT = `You are an expert developer operations assistant embedded in a live dashboard.
+Respond with clear, concise, and well-structured markdown text.
+Do NOT generate HTML, JSON component specs, or UI markup — only plain markdown.
+Be direct, technical, and helpful. Use bullet points, code blocks, and headers where appropriate.`;
+
+// ── Dashboard command types ─────────────────────────────────────────────────
+
+export type DashboardCommand =
+  | { type: 'reorder'; order: string[] }
+  | { type: 'update'; id: string; content: string; title?: string }
+  | { type: 'add_panel'; panel: { type: 'c1' | 'chat'; title: string; hasInput?: boolean } }
+  | { type: 'remove_panel'; id: string }
+  | { type: 'set_input'; id: string; hasInput: boolean }
+  | { type: 'set_type'; id: string; panelType: 'c1' | 'chat' }
+  | { type: 'set_title'; id: string; title: string };
+
+const COMMAND_DELIMITER_START = '__DASHBOARD_COMMANDS_START__';
+const COMMAND_DELIMITER_END = '__DASHBOARD_COMMANDS_END__';
+
+function parseCommands(raw: string): { content: string; commands: DashboardCommand[] } {
+  const startIdx = raw.indexOf(COMMAND_DELIMITER_START);
+  const endIdx = raw.indexOf(COMMAND_DELIMITER_END);
+
+  if (startIdx === -1 || endIdx === -1) {
+    return { content: raw, commands: [] };
+  }
+
+  const content = raw.substring(0, startIdx).trim();
+  const jsonStr = raw.substring(startIdx + COMMAND_DELIMITER_START.length, endIdx).trim();
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    const commands: DashboardCommand[] = Array.isArray(parsed) ? parsed : [parsed];
+    return { content, commands };
+  } catch {
+    return { content: raw, commands: [] };
+  }
+}
+
 // ── OpenAI client singleton ─────────────────────────────────────────────────
 
 let _client: OpenAI | null = null;
@@ -64,36 +108,93 @@ function getClient(): OpenAI {
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Generate a single panel's content via Thesys C1.
- * @param panelId      One of the panel IDs defined in PANEL_SYSTEM_PROMPTS
- * @param userContext  Optional extra context supplied by the user
+ * Unified panel call supporting named panel prompts, custom prompts, both panel
+ * types (C1 rich UI and plain-text chat), and dashboard layout commands.
+ *
+ * - If panelId matches a named panel, uses its dedicated system prompt.
+ * - Otherwise uses a generic C1 or chat prompt based on panelType.
+ * - Always appends the dashboard control protocol so the agent can issue commands.
  */
-export async function callThesysC1Panel(
-  panelId: string,
-  userContext = ''
-): Promise<string> {
-  const systemPrompt =
-    PANEL_SYSTEM_PROMPTS[panelId] ??
-    'Generate a compact developer dashboard panel with realistic sample data. Dark theme.';
-
-  const userPrompt = userContext
-    ? `Generate this panel. Additional context: ${userContext}`
-    : 'Generate this panel with realistic sample data.';
-
+export async function callThesysPanel(opts: {
+  panelId?: string;
+  userPrompt?: string;
+  panelType: 'c1' | 'chat';
+  panels: Array<{ id: string; type: string; title: string }>;
+}): Promise<{ content: string; commands: DashboardCommand[] }> {
+  const { panelId, userPrompt, panelType, panels } = opts;
   const client = getClient();
+
+  // Choose base system prompt
+  let basePrompt: string;
+  if (panelId && PANEL_SYSTEM_PROMPTS[panelId]) {
+    basePrompt = PANEL_SYSTEM_PROMPTS[panelId];
+  } else {
+    basePrompt = panelType === 'chat' ? CHAT_SYSTEM_PROMPT : C1_GENERIC_PROMPT;
+  }
+
+  // Append dashboard control protocol
+  const panelContext = panels.length
+    ? panels.map(p => `  - id="${p.id}" type="${p.type}" title="${p.title}"`).join('\n')
+    : '  (no panels currently)';
+
+  const systemPrompt = `${basePrompt}
+
+---
+DASHBOARD CONTROL PROTOCOL
+You can modify this dashboard by appending commands at the very end of your response.
+Current panels:
+${panelContext}
+
+To issue commands append EXACTLY this block AFTER your main response:
+${COMMAND_DELIMITER_START}
+[
+  { "type": "reorder", "order": ["id1", "id2", "id3"] },
+  { "type": "update", "id": "panelId", "content": "..." },
+  { "type": "add_panel", "panel": { "type": "chat", "title": "...", "hasInput": true } },
+  { "type": "remove_panel", "id": "panelId" },
+  { "type": "set_input", "id": "panelId", "hasInput": true },
+  { "type": "set_title", "id": "panelId", "title": "New Title" }
+]
+${COMMAND_DELIMITER_END}
+
+Include only the commands you actually want to execute.`;
+
+  const effectiveUserPrompt =
+    userPrompt ||
+    (panelId
+      ? 'Generate this panel with realistic sample data.'
+      : panelType === 'chat'
+        ? 'Introduce yourself and explain how you can help manage this dashboard.'
+        : 'Generate a developer dashboard panel.');
 
   const response = await client.chat.completions.create({
     model: 'c1/anthropic/claude-sonnet-4/v-20251230',
     messages: [
       { role: 'system', content: systemPrompt },
-      { role: 'user',   content: userPrompt   },
+      { role: 'user',   content: effectiveUserPrompt },
     ],
     temperature: 0.7,
-    max_tokens: 2000,
+    max_tokens: panelId ? 2000 : 4000,
   });
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error('No content returned from Thesys C1');
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error('No content returned from Thesys C1');
 
-  return content;
+  return parseCommands(raw);
+}
+
+/**
+ * Legacy single-panel call (kept for /api/dashboard backward compat).
+ */
+export async function callThesysC1Panel(
+  panelId: string,
+  userContext = ''
+): Promise<string> {
+  const result = await callThesysPanel({
+    panelId,
+    userPrompt: userContext || undefined,
+    panelType: 'c1',
+    panels: [],
+  });
+  return result.content;
 }
