@@ -1,108 +1,232 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import C1Component from '@/components/C1Component';
+import DashboardPanel, { Panel } from '@/components/DashboardPanel';
 import {
   Sparkles,
   TrendingUp,
   TrendingDown,
   Minus,
-  ArrowRight,
-  RefreshCw,
   Rocket,
   GitPullRequest,
   CheckCircle2,
   Activity,
+  PlusCircle,
+  MessageSquare,
+  LayoutDashboard,
 } from 'lucide-react';
+import { DashboardCommand } from '@/lib/thesys-client';
 
 /* ── Static KPI data ── */
 const KPI_DATA = [
-  {
-    label: 'Deployments',
-    value: '247',
-    change: '+12%',
-    trend: 'up' as const,
-    sub: 'Last 30 days',
-    icon: Rocket,
-    color: 'var(--accent-cyan)',
-    glow: 'var(--accent-cyan-glow)',
-  },
-  {
-    label: 'Open PRs',
-    value: '4',
-    change: '-2',
-    trend: 'down' as const,
-    sub: 'Awaiting review',
-    icon: GitPullRequest,
-    color: 'var(--accent-purple-light)',
-    glow: 'var(--accent-purple-glow)',
-  },
-  {
-    label: 'Test Coverage',
-    value: '94.2%',
-    change: '+1.8%',
-    trend: 'up' as const,
-    sub: 'vs last week',
-    icon: CheckCircle2,
-    color: 'var(--accent-green)',
-    glow: 'var(--accent-green-glow)',
-  },
-  {
-    label: 'Uptime',
-    value: '99.97%',
-    change: '—',
-    trend: 'flat' as const,
-    sub: 'Last 90 days',
-    icon: Activity,
-    color: 'var(--accent-pink)',
-    glow: 'var(--accent-pink-glow)',
-  },
+  { label: 'Deployments', value: '247', change: '+12%', trend: 'up' as const, sub: 'Last 30 days', icon: Rocket,         color: 'var(--accent-cyan)',         glow: 'var(--accent-cyan-glow)' },
+  { label: 'Open PRs',    value: '4',   change: '-2',   trend: 'down' as const, sub: 'Awaiting review', icon: GitPullRequest, color: 'var(--accent-purple-light)', glow: 'var(--accent-purple-glow)' },
+  { label: 'Coverage',    value: '94.2%', change: '+1.8%', trend: 'up' as const, sub: 'vs last week',  icon: CheckCircle2,  color: 'var(--accent-green)',        glow: 'var(--accent-green-glow)' },
+  { label: 'Uptime',      value: '99.97%', change: '—',  trend: 'flat' as const, sub: 'Last 90 days', icon: Activity,      color: 'var(--accent-pink)',         glow: 'var(--accent-pink-glow)' },
 ];
 
-const QUICK_PROMPTS = [
-  "Team PRs & review queue",
-  "Production deployment history",
-  "Open issues by priority",
-  "CI/CD pipeline status",
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+let _idCounter = 0;
+function newId() { return `panel-${Date.now()}-${++_idCounter}`; }
+
+function makePanel(overrides: Partial<Panel> = {}): Panel {
+  return {
+    id: newId(),
+    type: 'c1',
+    title: 'New Panel',
+    content: '',
+    isLoading: false,
+    error: '',
+    userPrompt: '',
+    hasInput: true,
+    ...overrides,
+  };
+}
+
+// ── Initial panels ───────────────────────────────────────────────────────────
+
+const INITIAL_PANELS: Panel[] = [
+  makePanel({ type: 'c1',  title: 'Developer Dashboard', hasInput: true }),
+  makePanel({ type: 'chat', title: 'Agent Assistant',     hasInput: true }),
 ];
+
+// ── Dashboard page ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [dashboardHtml, setDashboardHtml] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [userPrompt, setUserPrompt] = useState('');
+  const [panels, setPanels] = useState<Panel[]>(INITIAL_PANELS);
+  const dragSrcId = useRef<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  const generateDashboard = useCallback(async (prompt = '') => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/dashboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userPrompt: prompt }),
-      });
-      if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-      const data = await res.json();
-      setDashboardHtml(data.html || '');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate dashboard');
-    } finally {
-      setIsLoading(false);
+  // Panel helpers
+  const updatePanel = useCallback((id: string, patch: Partial<Panel>) => {
+    setPanels(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+  }, []);
+
+  const applyCommands = useCallback((commands: DashboardCommand[]) => {
+    for (const cmd of commands) {
+      switch (cmd.type) {
+        case 'reorder':
+          setPanels(prev => {
+            const map = new Map(prev.map(p => [p.id, p]));
+            const ordered = cmd.order.map(id => map.get(id)).filter(Boolean) as Panel[];
+            // append any panels not in the new order
+            const remaining = prev.filter(p => !cmd.order.includes(p.id));
+            return [...ordered, ...remaining];
+          });
+          break;
+        case 'update':
+          setPanels(prev => prev.map(p =>
+            p.id === cmd.id
+              ? { ...p, content: cmd.content, ...(cmd.title ? { title: cmd.title } : {}), isLoading: false }
+              : p
+          ));
+          break;
+        case 'add_panel':
+          setPanels(prev => [...prev, makePanel({
+            type: cmd.panel.type,
+            title: cmd.panel.title,
+            hasInput: cmd.panel.hasInput ?? true,
+          })]);
+          break;
+        case 'remove_panel':
+          setPanels(prev => prev.filter(p => p.id !== cmd.id));
+          break;
+        case 'set_input':
+          setPanels(prev => prev.map(p => p.id === cmd.id ? { ...p, hasInput: cmd.hasInput } : p));
+          break;
+        case 'set_type':
+          setPanels(prev => prev.map(p => p.id === cmd.id ? { ...p, type: cmd.panelType, content: '' } : p));
+          break;
+        case 'set_title':
+          setPanels(prev => prev.map(p => p.id === cmd.id ? { ...p, title: cmd.title } : p));
+          break;
+      }
     }
   }, []);
 
+  // Fetch content for a panel
+  const fetchPanel = useCallback(async (id: string, prompt?: string) => {
+    setPanels(prev => prev.map(p => p.id === id ? { ...p, isLoading: true, error: '' } : p));
+
+    // Snapshot state for API call
+    const snapshot = panels.concat(); // shallow copy
+    const panel = snapshot.find(p => p.id === id);
+    if (!panel) return;
+
+    const effectivePrompt = prompt ?? panel.userPrompt;
+
+    try {
+      const res = await fetch('/api/panel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: effectivePrompt,
+          panelType: panel.type,
+          panels: snapshot.map(p => ({ id: p.id, type: p.type, title: p.title })),
+        }),
+      });
+
+      if (!res.ok) throw new Error(`API error: ${res.statusText}`);
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
+      // Apply main content to this panel
+      setPanels(prev => prev.map(p =>
+        p.id === id ? { ...p, content: data.content ?? '', isLoading: false, error: '' } : p
+      ));
+
+      // Apply any dashboard commands
+      if (data.commands?.length) {
+        applyCommands(data.commands);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setPanels(prev => prev.map(p => p.id === id ? { ...p, isLoading: false, error: msg } : p));
+    }
+  }, [panels, applyCommands]);
+
+  // Auto-load initial panels on mount
   useEffect(() => {
-    generateDashboard();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    for (const panel of INITIAL_PANELS) {
+      fetchPanel(panel.id, panel.type === 'c1'
+        ? 'Generate a comprehensive developer dashboard.'
+        : 'Introduce yourself and explain how you can help manage and control this dashboard.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    generateDashboard(userPrompt);
-  };
+  // ── Drag-and-drop handlers ──────────────────────────────────────────────
 
-  const handleQuickPrompt = (p: string) => {
-    setUserPrompt(p);
-    generateDashboard(p);
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
+    dragSrcId.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverId(id);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverId(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = dragSrcId.current;
+    setDragOverId(null);
+    dragSrcId.current = null;
+
+    if (!sourceId || sourceId === targetId) return;
+
+    setPanels(prev => {
+      const next = [...prev];
+      const srcIdx = next.findIndex(p => p.id === sourceId);
+      const tgtIdx = next.findIndex(p => p.id === targetId);
+      if (srcIdx === -1 || tgtIdx === -1) return prev;
+      const [removed] = next.splice(srcIdx, 1);
+      next.splice(tgtIdx, 0, removed);
+      return next;
+    });
+  }, []);
+
+  // ── Panel action handlers ───────────────────────────────────────────────
+
+  const handlePromptChange = useCallback((id: string, value: string) => {
+    updatePanel(id, { userPrompt: value });
+  }, [updatePanel]);
+
+  const handleSubmit = useCallback((id: string) => {
+    fetchPanel(id);
+  }, [fetchPanel]);
+
+  const handleRemove = useCallback((id: string) => {
+    setPanels(prev => prev.filter(p => p.id !== id));
+  }, []);
+
+  const handleToggleInput = useCallback((id: string) => {
+    setPanels(prev => prev.map(p => p.id === id ? { ...p, hasInput: !p.hasInput } : p));
+  }, []);
+
+  const handleToggleType = useCallback((id: string) => {
+    setPanels(prev => prev.map(p =>
+      p.id === id ? { ...p, type: p.type === 'c1' ? 'chat' : 'c1', content: '' } : p
+    ));
+  }, []);
+
+  const handleRefresh = useCallback((id: string) => {
+    fetchPanel(id);
+  }, [fetchPanel]);
+
+  const addPanel = (type: 'c1' | 'chat') => {
+    const panel = makePanel({
+      type,
+      title: type === 'c1' ? 'C1 Panel' : 'Chat Panel',
+      hasInput: true,
+    });
+    setPanels(prev => [...prev, panel]);
   };
 
   return (
@@ -112,9 +236,7 @@ export default function DashboardPage() {
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {KPI_DATA.map((kpi) => {
           const Icon = kpi.icon;
-          const TrendIcon =
-            kpi.trend === 'up'   ? TrendingUp   :
-            kpi.trend === 'down' ? TrendingDown : Minus;
+          const TrendIcon = kpi.trend === 'up' ? TrendingUp : kpi.trend === 'down' ? TrendingDown : Minus;
 
           return (
             <div
@@ -141,73 +263,39 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* ── Content + Sidebar ── */}
-      <div className="flex flex-col gap-4 lg:flex-row">
-
-        {/* C1 generated content */}
-        <div className="min-w-0 flex-1">
-          <C1Component html={dashboardHtml} isLoading={isLoading} error={error} />
-        </div>
-
-        {/* Customisation panel */}
-        <div className="w-full flex-shrink-0 lg:w-72">
-          <div className="prompt-panel sticky top-0">
-            <div className="prompt-panel-header">
-              <Sparkles size={13} className="prompt-panel-icon" />
-              Customize
-            </div>
-            <p className="prompt-panel-description">
-              Describe the view you need and C1 will generate it instantly.
-            </p>
-
-            <form onSubmit={handleSubmit}>
-              <textarea
-                className="prompt-textarea"
-                placeholder="e.g., Show my team's open PRs sorted by staleness, deployment status for prod, and recent incidents…"
-                value={userPrompt}
-                onChange={(e) => setUserPrompt(e.target.value)}
-                rows={4}
-              />
-              <div className="mt-2.5 flex gap-2">
-                <button type="submit" disabled={isLoading} className="btn-generate flex-1">
-                  {isLoading
-                    ? <RefreshCw size={12} className="animate-spin" />
-                    : <Sparkles size={12} />
-                  }
-                  {isLoading ? 'Generating…' : 'Generate'}
-                </button>
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  className="btn-refresh"
-                  title="Reset to default"
-                  onClick={() => { setUserPrompt(''); generateDashboard(''); }}
-                >
-                  <RefreshCw size={13} />
-                </button>
-              </div>
-            </form>
-
-            {/* Quick prompts */}
-            <div className="mt-5">
-              <p className="quick-prompts-label">Quick prompts</p>
-              <div className="mt-2 flex flex-col gap-1">
-                {QUICK_PROMPTS.map((p) => (
-                  <button
-                    key={p}
-                    className="quick-prompt-btn"
-                    onClick={() => handleQuickPrompt(p)}
-                  >
-                    <ArrowRight size={10} className="quick-prompt-icon" />
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
+      {/* ── Panel grid ── */}
+      <div className="panel-grid">
+        {panels.map(panel => (
+          <DashboardPanel
+            key={panel.id}
+            panel={panel}
+            isDragOver={dragOverId === panel.id}
+            onPromptChange={handlePromptChange}
+            onSubmit={handleSubmit}
+            onRemove={handleRemove}
+            onToggleInput={handleToggleInput}
+            onToggleType={handleToggleType}
+            onRefresh={handleRefresh}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          />
+        ))}
       </div>
+
+      {/* ── Add Panel row ── */}
+      <div className="add-panel-row">
+        <button className="add-panel-btn" onClick={() => addPanel('c1')}>
+          <LayoutDashboard size={13} />
+          Add C1 Panel
+        </button>
+        <button className="add-panel-btn add-panel-btn-chat" onClick={() => addPanel('chat')}>
+          <MessageSquare size={13} />
+          Add Chat Panel
+        </button>
+      </div>
+
     </DashboardLayout>
   );
 }
