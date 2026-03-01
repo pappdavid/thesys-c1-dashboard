@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   GripVertical,
   RefreshCw,
@@ -10,8 +10,7 @@ import {
   AlertCircle,
   Loader2,
   SendHorizonal,
-  ToggleLeft,
-  ToggleRight,
+  Save,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import ChatContent from './ChatContent';
@@ -30,6 +29,7 @@ export interface Panel {
   isLoading: boolean;
   error: string;
   userPrompt: string;
+  /** Controls text-input footer visibility (only relevant for chat panels) */
   hasInput: boolean;
 }
 
@@ -41,15 +41,29 @@ interface DashboardPanelProps {
   onPromptChange: (id: string, value: string) => void;
   onSubmit: (id: string) => void;
   onRemove: (id: string) => void;
-  onToggleInput: (id: string) => void;
   onToggleType: (id: string) => void;
   onRefresh: (id: string) => void;
+  /** Called when user clicks Save on a C1 panel with interactive elements */
+  onSaveInteractive: (id: string, formData: Record<string, string>) => void;
   // HTML5 DnD
   onDragStart: (e: React.DragEvent, id: string) => void;
   onDragOver: (e: React.DragEvent, id: string) => void;
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent, id: string) => void;
 }
+
+// ── Selectors for form elements ─────────────────────────────────────────────
+
+const INTERACTIVE_SELECTOR = [
+  'input',
+  'select',
+  'textarea',
+  '[role="slider"]',
+  '[role="checkbox"]',
+  '[role="combobox"]',
+  '[role="switch"]',
+  '[role="spinbutton"]',
+].join(', ');
 
 // ── Component ───────────────────────────────────────────────────────────────
 
@@ -59,15 +73,78 @@ export default function DashboardPanel({
   onPromptChange,
   onSubmit,
   onRemove,
-  onToggleInput,
   onToggleType,
   onRefresh,
+  onSaveInteractive,
   onDragStart,
   onDragOver,
   onDragLeave,
   onDrop,
 }: DashboardPanelProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [hasInteractive, setHasInteractive] = useState(false);
+
+  // ── Detect interactive form elements inside C1 panel content ────────────
+
+  useEffect(() => {
+    if (panel.type !== 'c1' || !panel.content || panel.isLoading) {
+      setHasInteractive(false);
+      return;
+    }
+
+    const checkForInteractive = () => {
+      const el = contentRef.current;
+      if (!el) return;
+      const found = el.querySelectorAll(INTERACTIVE_SELECTOR);
+      setHasInteractive(found.length > 0);
+    };
+
+    // Delayed initial check (C1 SDK renders asynchronously)
+    const timer = setTimeout(checkForInteractive, 600);
+
+    // Watch for dynamic DOM changes from the SDK
+    const el = contentRef.current;
+    let observer: MutationObserver | undefined;
+    if (el) {
+      observer = new MutationObserver(checkForInteractive);
+      observer.observe(el, { childList: true, subtree: true, attributes: true });
+    }
+
+    return () => {
+      clearTimeout(timer);
+      observer?.disconnect();
+    };
+  }, [panel.type, panel.content, panel.isLoading]);
+
+  // ── Collect form values from the rendered C1 content ────────────────────
+
+  const handleSave = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    const formData: Record<string, string> = {};
+    let fieldIndex = 0;
+
+    el.querySelectorAll('input, select, textarea').forEach((element: Element) => {
+      const input = element as HTMLInputElement;
+      const name =
+        input.name ||
+        input.id ||
+        input.getAttribute('aria-label') ||
+        `field-${++fieldIndex}`;
+
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        formData[name] = String(input.checked);
+      } else {
+        formData[name] = input.value;
+      }
+    });
+
+    onSaveInteractive(panel.id, formData);
+  }, [panel.id, onSaveInteractive]);
+
+  // ── Chat text-input keyboard shortcut ────────────────────────────────────
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -106,7 +183,7 @@ export default function DashboardPanel({
         {/* Title */}
         <span className="panel-title">{panel.title}</span>
 
-        {/* Controls */}
+        {/* Controls (hover-reveal) */}
         <div className="panel-controls">
           {/* Toggle type */}
           <button
@@ -117,18 +194,6 @@ export default function DashboardPanel({
             {panel.type === 'c1'
               ? <MessageSquare size={12} />
               : <LayoutDashboard size={12} />
-            }
-          </button>
-
-          {/* Toggle input */}
-          <button
-            className={`panel-ctrl-btn${panel.hasInput ? ' active' : ''}`}
-            title={panel.hasInput ? 'Hide input' : 'Show input'}
-            onClick={() => onToggleInput(panel.id)}
-          >
-            {panel.hasInput
-              ? <ToggleRight size={12} />
-              : <ToggleLeft size={12} />
             }
           </button>
 
@@ -154,7 +219,7 @@ export default function DashboardPanel({
       </div>
 
       {/* ── Content ── */}
-      <div className="panel-content">
+      <div className="panel-content" ref={contentRef}>
         {panel.isLoading ? (
           <div className="panel-skeleton">
             <div className="skeleton-bar h-6 w-40 mb-3" />
@@ -189,17 +254,27 @@ export default function DashboardPanel({
         )}
       </div>
 
-      {/* ── Input footer (optional) ── */}
-      {panel.hasInput && (
+      {/* ── Interactive save footer (C1 panels with detected form elements) ── */}
+      {panel.type === 'c1' && hasInteractive && !panel.isLoading && (
+        <div className="panel-interactive-footer">
+          <button
+            className="panel-save-btn"
+            onClick={handleSave}
+            title="Save and submit form values to the agent"
+          >
+            <Save size={13} />
+            <span>Save &amp; Submit</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Text-input footer (chat panels only) ── */}
+      {panel.type === 'chat' && panel.hasInput && (
         <div className="panel-footer">
           <textarea
             ref={textareaRef}
             className="panel-textarea"
-            placeholder={
-              panel.type === 'c1'
-                ? 'Describe the UI you want… (⌘+Enter to submit)'
-                : 'Ask the agent anything… (⌘+Enter to submit)'
-            }
+            placeholder="Ask the agent anything… (⌘+Enter to submit)"
             value={panel.userPrompt}
             rows={2}
             onChange={(e) => onPromptChange(panel.id, e.target.value)}
