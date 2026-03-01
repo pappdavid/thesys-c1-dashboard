@@ -11,9 +11,7 @@ interface C1ComponentProps {
   html: string;
   isLoading?: boolean;
   error?: string;
-  /** Panel title shown in the card header */
-  title?: string;
-  /** Called when the user clicks the per-panel refresh button */
+  /** Called when the user clicks the hover-reveal refresh button */
   onRefresh?: () => void;
 }
 
@@ -21,7 +19,6 @@ export default function C1Component({
   html,
   isLoading = false,
   error,
-  title,
   onRefresh,
 }: C1ComponentProps) {
   const [c1Response, setC1Response] = useState(html);
@@ -33,27 +30,21 @@ export default function C1Component({
   return (
     <div className="c1-content-card">
 
-      {/* ── Panel header ── */}
-      {title && (
-        <div className="c1-panel-header">
-          <span className="c1-panel-title">{title}</span>
-          {onRefresh && (
-            <button
-              className="c1-refresh-btn"
-              onClick={onRefresh}
-              disabled={isLoading}
-              title="Refresh panel"
-            >
-              <RefreshCw size={11} className={isLoading ? 'animate-spin' : ''} />
-            </button>
-          )}
-        </div>
+      {/* Refresh button — icon-only, reveals on card hover */}
+      {onRefresh && (
+        <button
+          className="c1-refresh-overlay"
+          onClick={onRefresh}
+          disabled={isLoading}
+          title="Refresh panel"
+        >
+          <RefreshCw size={11} className={isLoading ? 'animate-spin' : ''} />
+        </button>
       )}
 
       {isLoading ? (
         /* Skeleton loader */
-        <div className="space-y-2.5 p-4">
-          <div className="skeleton-bar h-3.5 w-32" />
+        <div className="space-y-2.5 p-4 pt-5">
           <div className="skeleton-bar h-3 w-full" />
           <div className="skeleton-bar h-3 w-11/12" />
           <div className="skeleton-bar h-3 w-10/12" />
@@ -98,7 +89,6 @@ export default function C1Component({
           style={{ color: 'var(--text-muted)' }}
         >
           <RefreshCw size={14} className="animate-spin opacity-30" />
-          <p className="text-xs">Initializing…</p>
         </div>
       )}
     </div>

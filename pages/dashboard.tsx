@@ -6,7 +6,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  RefreshCw,
+  RotateCcw,
   Rocket,
   GitPullRequest,
   CheckCircle2,
@@ -147,17 +147,15 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* ── Section header ── */}
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="panels-section-title">Live Panels</h2>
+      {/* ── Refresh-all icon ── */}
+      <div className="mb-3 flex justify-end">
         <button
           className="btn-refresh-all"
           onClick={() => PANELS.forEach((p) => fetchPanel(p.id))}
           disabled={anyLoading}
           title="Refresh all panels"
         >
-          <RefreshCw size={12} className={anyLoading ? 'animate-spin' : ''} />
-          Refresh all
+          <RotateCcw size={12} className={anyLoading ? 'animate-spin' : ''} />
         </button>
       </div>
 
@@ -168,7 +166,6 @@ export default function DashboardPage() {
           return (
             <C1Component
               key={panel.id}
-              title={panel.title}
               html={state.content}
               isLoading={state.loading}
               error={state.error}
