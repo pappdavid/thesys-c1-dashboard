@@ -15,13 +15,7 @@ export default function DashboardLayout({
 }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
 
-  const navItems = [
-    { label: 'Overview', icon: BarChart3, active: true },
-    { label: 'Pull Requests', icon: 'GitPullRequest' },
-    { label: 'CI/CD Pipeline', icon: 'Zap' },
-    { label: 'Issues', icon: 'AlertCircle' },
-    { label: 'Logs', icon: 'FileText' },
-  ];
+  const navLabels = ['Overview', 'Pull Requests', 'CI/CD Pipeline', 'Issues', 'Logs'];
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-50">
@@ -44,17 +38,17 @@ export default function DashboardLayout({
 
         {/* Navigation */}
         <nav className="flex flex-col gap-1 p-4">
-          {navItems.map((item) => (
+          {navLabels.map((label, idx) => (
             <button
-              key={item.label}
+              key={label}
               className={clsx(
                 'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                item.active
+                idx === 0
                   ? 'bg-gradient-to-r from-blue-500/30 to-purple-600/30 text-white shadow-lg shadow-blue-500/20 border border-blue-400/50'
                   : 'text-slate-400 hover:text-slate-50 hover:bg-slate-800/50 border border-transparent'
               )}
             >
-              {item.label}
+              {label}
             </button>
           ))}
         </nav>
