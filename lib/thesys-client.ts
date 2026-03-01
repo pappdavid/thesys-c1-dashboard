@@ -46,7 +46,7 @@ export async function callThesysC1(userPrompt: string): Promise<string> {
   const client = getClient();
 
   const response = await client.chat.completions.create({
-    model: 'c1/anthropic/claude-sonnet-4-5',
+    model: 'c1/anthropic/claude-sonnet-4/v-20251230',
     messages: [
       {
         role: 'system',
