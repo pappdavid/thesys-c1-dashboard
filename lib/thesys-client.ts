@@ -86,6 +86,127 @@ export type DashboardCommand =
   | { type: 'set_type'; id: string; panelType: 'c1' | 'chat' }
   | { type: 'set_title'; id: string; title: string };
 
+// ── Extract plain markdown from C1 component JSON ───────────────────────────
+
+/**
+ * The C1 API always returns structured component JSON even when the system
+ * prompt asks for plain markdown.  For chat panels we walk the component tree
+ * and pull out readable markdown so `ChatContent` can render it.
+ */
+function extractMarkdownFromC1(raw: string): string {
+  // Strip <content thesys="true">…</content> wrapper if present
+  let jsonStr = raw;
+  const wrapperMatch = raw.match(/<content[^>]*>([\s\S]*)<\/content>/);
+  if (wrapperMatch) {
+    jsonStr = wrapperMatch[1].trim();
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    // Not JSON — already plain text / markdown
+    return raw;
+  }
+
+  const lines: string[] = [];
+
+  function walk(node: any): void {
+    if (!node || typeof node !== 'object') return;
+
+    const comp: string | undefined = node.component;
+    const props: any = node.props ?? {};
+
+    switch (comp) {
+      case 'Header':
+        if (props.title) lines.push(`# ${props.title}`);
+        if (props.subtitle) lines.push(props.subtitle);
+        lines.push('');
+        break;
+
+      case 'TextContent':
+        if (props.textMarkdown) lines.push(props.textMarkdown);
+        lines.push('');
+        break;
+
+      case 'InlineHeader':
+        if (props.heading) lines.push(`### ${props.heading}`);
+        if (props.description) lines.push(props.description);
+        lines.push('');
+        break;
+
+      case 'List':
+        if (Array.isArray(props.items)) {
+          for (const item of props.items) {
+            const title = item.title ?? '';
+            const sub = item.subtitle ? ` — ${item.subtitle}` : '';
+            lines.push(`- **${title}**${sub}`);
+          }
+          lines.push('');
+        }
+        break;
+
+      case 'FollowUpBlock':
+        if (Array.isArray(props.followUpText)) {
+          for (const text of props.followUpText) {
+            lines.push(`- ${text}`);
+          }
+          lines.push('');
+        }
+        break;
+
+      case 'Table':
+        if (Array.isArray(props.headers) && Array.isArray(props.rows)) {
+          lines.push('| ' + props.headers.join(' | ') + ' |');
+          lines.push('| ' + props.headers.map(() => '---').join(' | ') + ' |');
+          for (const row of props.rows) {
+            const cells = Array.isArray(row) ? row : Object.values(row);
+            lines.push('| ' + cells.join(' | ') + ' |');
+          }
+          lines.push('');
+        }
+        break;
+
+      case 'CodeBlock':
+        lines.push('```' + (props.language ?? ''));
+        lines.push(props.code ?? '');
+        lines.push('```');
+        lines.push('');
+        break;
+
+      case 'Divider':
+        lines.push('---');
+        lines.push('');
+        break;
+
+      default:
+        // Recurse into children arrays or single-child props
+        if (Array.isArray(props.children)) {
+          for (const child of props.children) walk(child);
+        } else if (props.children && typeof props.children === 'object') {
+          walk(props.children);
+        }
+        // Also check for text / textMarkdown on unknown components
+        if (props.text && typeof props.text === 'string') {
+          lines.push(props.text);
+          lines.push('');
+        }
+        if (props.textMarkdown && typeof props.textMarkdown === 'string' && comp !== 'TextContent') {
+          lines.push(props.textMarkdown);
+          lines.push('');
+        }
+        break;
+    }
+  }
+
+  // The top-level object may have { component: … } or { component: { component: … } }
+  const root = parsed.component ?? parsed;
+  walk(root);
+
+  const result = lines.join('\n').trim();
+  // If extraction produced nothing, return the raw string as fallback
+  return result || raw;
+}
 const COMMAND_DELIMITER_START = '__DASHBOARD_COMMANDS_START__';
 const COMMAND_DELIMITER_END = '__DASHBOARD_COMMANDS_END__';
 
@@ -206,7 +327,13 @@ Include only the commands you actually want to execute.`;
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error('No content returned from Thesys C1');
 
-  return parseCommands(raw);
+  const { content, commands } = parseCommands(raw);
+
+  // C1 API always returns structured component JSON; for chat panels we
+  // extract readable markdown so the ChatContent renderer can display it.
+  const finalContent = panelType === 'chat' ? extractMarkdownFromC1(content) : content;
+
+  return { content: finalContent, commands };
 }
 
 /**
