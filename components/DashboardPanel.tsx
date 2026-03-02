@@ -13,8 +13,10 @@ import {
   Save,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import ChatContent from './ChatContent';
 
+// The Thesys C1 API always returns structured component JSON. ThesysRenderer
+// handles both C1 panels and chat panels — the C1 SDK renders text, lists,
+// headings and follow-up blocks natively inside a dark ThemeProvider.
 const ThesysRenderer = dynamic(() => import('./ThesysRenderer'), { ssr: false });
 
 // ── Panel data type (shared with dashboard.tsx) ────────────────────────────
@@ -239,13 +241,7 @@ export default function DashboardPanel({
             </div>
           </div>
         ) : panel.content ? (
-          panel.type === 'c1' ? (
-            <ThesysRenderer c1Response={panel.content} />
-          ) : (
-            <div className="panel-chat-wrap">
-              <ChatContent text={panel.content} />
-            </div>
-          )
+          <ThesysRenderer c1Response={panel.content} />
         ) : (
           <div className="panel-idle">
             <Loader2 size={22} className="animate-spin opacity-40" />

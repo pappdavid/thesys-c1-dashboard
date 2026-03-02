@@ -329,11 +329,10 @@ Include only the commands you actually want to execute.`;
 
   const { content, commands } = parseCommands(raw);
 
-  // C1 API always returns structured component JSON; for chat panels we
-  // extract readable markdown so the ChatContent renderer can display it.
-  const finalContent = panelType === 'chat' ? extractMarkdownFromC1(content) : content;
-
-  return { content: finalContent, commands };
+  // The C1 API always returns structured component JSON regardless of
+  // the system prompt.  Both panel types are rendered by ThesysRenderer
+  // on the client, so pass the content through unchanged.
+  return { content, commands };
 }
 
 /**

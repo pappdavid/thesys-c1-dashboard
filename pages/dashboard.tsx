@@ -127,8 +127,9 @@ export default function DashboardPage() {
             }),
           });
 
-          if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-          const data = await res.json();
+          // Read body first so we can surface the actual server error message
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error ?? `API error: ${res.statusText}`);
           if (data.error) throw new Error(data.error);
 
           setPanels(ps => ps.map(p =>
