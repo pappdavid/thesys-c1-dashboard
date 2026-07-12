@@ -3,6 +3,7 @@ const { test, expect } = require('@playwright/test');
 test('dashboard loads and core panel interactions work through the GUI', async ({ page }) => {
   const panelRequests = [];
   const pageErrors = [];
+  const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000';
 
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -18,7 +19,7 @@ test('dashboard loads and core panel interactions work through the GUI', async (
     });
   });
 
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText('Developer Dashboard', { exact: true })).toBeVisible();
   await expect(page.locator('.dashboard-panel')).toHaveCount(7);
