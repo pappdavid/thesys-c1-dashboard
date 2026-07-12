@@ -2,14 +2,16 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, repair/verified-build]
   pull_request:
     branches: [main, develop]
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         node-version: [18.x, 20.x]
@@ -21,7 +23,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -35,6 +37,69 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          THESYS_API_KEY: ${{ secrets.THESYS_API_KEY }}
+          THESYS_API_KEY: ci-build-placeholder
 
-  # Deployments are handled automatically by the Vercel GitHub integration
+  gui-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install Playwright test runner
+        run: npm install --no-save @playwright/test@1.51.1
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build production application
+        run: npm run build
+        env:
+          THESYS_API_KEY: ci-runtime-placeholder
+
+      - name: Start production server
+        run: |
+          THESYS_API_KEY=ci-runtime-placeholder npm start > /tmp/thesys-dashboard.log 2>&1 &
+          echo $! > /tmp/thesys-dashboard.pid
+          for attempt in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:3000/dashboard > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/thesys-dashboard.log
+          exit 1
+
+      - name: Exercise dashboard in Chromium
+        run: npx playwright test tests/gui-smoke.spec.js --reporter=line
+        env:
+          BASE_URL: http://127.0.0.1:3000
+
+      - name: Print server log on failure
+        if: failure()
+        run: cat /tmp/thesys-dashboard.log || true
+
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-gui-diagnostics
+          path: test-results
+          if-no-files-found: ignore
+
+      - name: Stop production server
+        if: always()
+        run: |
+          if [ -f /tmp/thesys-dashboard.pid ]; then
+            kill "$(cat /tmp/thesys-dashboard.pid)" || true
+          fi
+
+  # Deployments are handled automatically by the Vercel GitHub integration.
