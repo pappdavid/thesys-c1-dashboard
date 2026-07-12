@@ -102,7 +102,7 @@ jobs:
             kill "$(cat /tmp/thesys-dashboard.pid)" || true
           fi
 
-  live-preview-gui:
+  live-production-gui:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -123,7 +123,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Wait for Vercel preview
+      - name: Wait for public deployment
         run: |
           for attempt in {1..60}; do
             if curl --fail --silent --show-error "$PREVIEW_URL/dashboard" > /dev/null; then
@@ -131,21 +131,21 @@ jobs:
             fi
             sleep 5
           done
-          echo "Preview did not become reachable"
+          echo "Public deployment did not become reachable"
           exit 1
         env:
-          PREVIEW_URL: https://thesys-c1-dashboard-git-repair-3197bb-davids-projects-3d9eb396.vercel.app
+          PREVIEW_URL: https://thesys-c1-dashboard.vercel.app
 
-      - name: Exercise deployed preview and real Thesys API
+      - name: Exercise deployed GUI and real Thesys API
         run: npx playwright test tests/live-preview.spec.js --reporter=line
         env:
-          PREVIEW_URL: https://thesys-c1-dashboard-git-repair-3197bb-davids-projects-3d9eb396.vercel.app
+          PREVIEW_URL: https://thesys-c1-dashboard.vercel.app
 
       - name: Upload live GUI evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-preview-gui-evidence
+          name: live-production-gui-evidence
           path: |
             live-preview-dashboard.png
             live-preview-diagnostics.json
