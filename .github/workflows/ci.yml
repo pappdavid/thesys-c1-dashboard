@@ -148,6 +148,7 @@ jobs:
           name: live-preview-gui-evidence
           path: |
             live-preview-dashboard.png
+            live-preview-diagnostics.json
             test-results
           if-no-files-found: warn
           retention-days: 7
