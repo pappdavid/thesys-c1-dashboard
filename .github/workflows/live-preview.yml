@@ -1,0 +1,60 @@
+name: Live Preview GUI
+
+on:
+  push:
+    branches: [repair/verified-build]
+
+permissions:
+  contents: read
+
+jobs:
+  live-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright test runner
+        run: npm install --no-save @playwright/test@1.51.1
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for preview deployment
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error "$PREVIEW_URL/dashboard" > /dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Preview did not become reachable"
+          exit 1
+        env:
+          PREVIEW_URL: https://thesys-c1-dashboard-git-repair-3197bb-davids-projects-3d9eb396.vercel.app
+
+      - name: Exercise deployed preview and live Thesys API
+        run: npx playwright test tests/live-preview.spec.js --reporter=line
+        env:
+          PREVIEW_URL: https://thesys-c1-dashboard-git-repair-3197bb-davids-projects-3d9eb396.vercel.app
+
+      - name: Upload live GUI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-preview-gui-evidence
+          path: |
+            live-preview-dashboard.png
+            test-results
+          if-no-files-found: warn
+          retention-days: 7
